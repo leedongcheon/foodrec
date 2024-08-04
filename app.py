@@ -1,6 +1,5 @@
-from flask import Flask, render_template, request, jsonify
-import google.generativeai as genai
-import requests
+from flask import Flask, render_template, request, jsonify # type: ignore
+import google.generativeai as genai # type: ignore
 import json
 
 import naver
@@ -19,7 +18,7 @@ ai: (네이버 크롤링 사용) 식당에 있는 메뉴, 가격, 이미지 제�
 
 끝
 """
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 import os
 load_dotenv()
 
