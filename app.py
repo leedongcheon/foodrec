@@ -57,7 +57,7 @@ chat_session = model.start_chat(
 
 @app.route('/')
 def index():
-    return send_file('index.html')
+    return send_from_directory('.', 'index.html')
 
 @app.route('/get_recommendation', methods=['POST'])
 def get_recommendation():
