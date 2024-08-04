@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>음식 추천 채팅 서비스</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAa1WZ2r4mX2lWT05JRUTIC1XmgOz_Uviw&libraries=places"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+        }
+        #map {
+            height: 100vh;
+            width: 40%;
+        }
+        #chat-container {
+            width: 60%;
+            height: 90vh;
+            border: 1px solid #ddd;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-left: 20px;
+            box-sizing: border-box;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-radius: 5px;
+            word-wrap: break-word;
+            white-space: normal;
+        }
+        .user-message {
+            background-color: #e6f2ff;
+            text-align: right;
+        }
+        .ai-message {
+            background-color: #f0f0f0;
+        }
+        #user-input {
+            width: 70%;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+        #send-button {
+            width: 25%;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div id="chat-container">
+        <h1>음식 추천 채팅 서비스</h1>
+        <p>현재 위치를 기반으로 음식을 추천해드립니다.</p>
+        <div id="messages"></div>
+        
+        <input type="text" id="user-input" placeholder="메시지를 입력하세요...">
+        <button id="send-button">전송</button>
+    </div>
+
+    <script>
+        let userLat, userLng;
+        let map;
+
+        function initMap(lat, lng) {
+            const userLocation = { lat: lat, lng: lng };
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: userLocation,
+                zoom: 15
+            });
+
+            new google.maps.Marker({
+                position: userLocation,
+                map: map,
+                title: "현재 위치"
+            });
+        }
+
+        function addMarker(lat, lng, title) {
+            const location = { lat: lat, lng: lng };
+            new google.maps.Marker({
+                position: location,
+                map: map,
+                title: title
+            });
+        }
+
+        function addMarkerByPlaceId(placeId) {
+            const service = new google.maps.places.PlacesService(map);
+
+            service.getDetails({ placeId: placeId }, (place, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && place.geometry) {
+                    const location = place.geometry.location;
+                    const name = place.name;
+                    const address = place.formatted_address || '주소 없음';
+
+                    const infowindow = new google.maps.InfoWindow({
+                        content: `<div><strong>${name}</strong><br>${address}</div>`
+                    });
+
+                    const marker = new google.maps.Marker({
+                        position: location,
+                        map: map,
+                        title: name
+                    });
+
+                    marker.addListener('click', () => {
+                        infowindow.open(map, marker);
+                    });
+
+                    map.setCenter(location);
+                    map.setZoom(15);
+                } else {
+                    console.error('장소를 찾을 수 없습니다:', status);
+                }
+            });
+        }
+
+        function addMessage(message, isUser = false) {
+            const messageDiv = $('<div>').addClass('message');
+            if (isUser) {
+                messageDiv.addClass('user-message');
+            } else {
+                messageDiv.addClass('ai-message');
+            }
+            messageDiv.text(message);
+            $('#messages').append(messageDiv);
+            $('#chat-container').scrollTop($('#chat-container')[0].scrollHeight);
+        }
+
+        function isDictionary(obj) {
+            return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+        }
+
+        function generateTable_google(data) {
+            if (!Array.isArray(data)) {
+                return '<p>유효한 배열이 아닙니다.</p>';
+            }
+
+            let table = '<table><thead><tr><th>이름</th><th>주소</th><th>평점</th><th>거리</th></tr></thead><tbody>';
+
+            data.forEach(details => {
+                table += `<tr>
+                    <td>${details.name || '이름 없음'}</td>
+                    <td>${details.adress || '주소 없음'}</td>
+                    <td>${details.rating !== undefined ? details.rating : '평점 없음'}</td>
+                    <td>${details.distance || '거리 없음'}</td>
+                </tr>`;
+            });
+
+            table += '</tbody></table>';
+            return table;
+        }
+
+        function generateTable_naver(data) {
+            if (!isDictionary(data)) {
+                return '<p>유효한 딕셔너리가 아닙니다.</p>';
+            }
+
+            let table = '<table><thead><tr><th>메뉴</th><th>가격</th><th>메뉴 이미지</th></tr></thead><tbody>';
+
+            for (const [restaurantName, restaurantDetails] of Object.entries(data)) {
+                const menuname = restaurantDetails.menu_name || [];
+                const menuprice = restaurantDetails.menu_price || [];
+                const menuImages = restaurantDetails.menu_image || [];
+
+                for (let i = 0; i < menuname.length; i++) {
+                    const itemName = menuname[i];
+                    const itemPrice = menuprice[i] || '';
+                    const itemImage = menuImages[i] || '';
+
+                    table += `<tr>
+                        <td>${itemName}</td>
+                        <td>${itemPrice}</td>
+                        <td>${itemImage ? `<img src="${itemImage}" alt="${itemName}" style="width: 50px; height: 50px;">` : '이미지 없음'}</td>
+                    </tr>`;
+                }
+            }
+
+            table += '</tbody></table>';
+            return table;
+        }
+
+        function getLocation() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    addMessage(`위치를 가져왔습니다. 위도: ${userLat}, 경도: ${userLng}`, false);
+                    addMessage("음식 취향이나 상황을 알려주세요.", false);
+                    initMap(userLat, userLng);
+                }, function() {
+                    addMessage("위치 정보를 가져오는 데 실패했습니다.", false);
+                });
+            } else {
+                addMessage("이 브라우저에서는 위치 정보를 사용할 수 없습니다.", false);
+            }
+        }
+
+        function sendMessage() {
+            const userMessage = $('#user-input').val();
+            if (userMessage.trim() === '') return;
+
+            addMessage(userMessage, true);
+            $('#user-input').val('');
+
+            if (!userLat || !userLng) {
+                getLocation();
+                return;
+            }
+
+            $.ajax({
+                url: '/get_recommendation',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    latitude: userLat,
+                    longitude: userLng,
+                    request: userMessage
+                }),
+                success: function(response) {
+                    addMessage(response.answer, false);
+                    if (response.crawling_f === "naver") {
+                        const tableHTML = generateTable_naver(response.info);
+                        $('#messages').append(tableHTML);
+                        $('#chat-container').scrollTop($('#chat-container')[0].scrollHeight);
+                    } else if (response.crawling_f === "google") {
+                        const tableHTML = generateTable_google(response.info);
+                        if (response.marker === 'yes') {
+                            const info = response.info;
+                            if (Array.isArray(info)) {
+                                for (const details of info) {
+                                    addMarkerByPlaceId(details.place_id);
+                                }
+                            } else {
+                                console.error('응답 데이터가 배열이 아닙니다.');
+                            }
+                        }
+                        $('#messages').append(tableHTML);
+                        $('#chat-container').scrollTop($('#chat-container')[0].scrollHeight);
+                    } else {
+                        addMessage("알 수 없는 응답 형식입니다.", false);
+                    }
+                },
+                error: function() {
+                    addMessage("추천을 가져오는 데 실패했습니다. 다시 시도해주세요.", false);
+                }
+            });
+        }
+
+        $('#send-button').click(sendMessage);
+        $('#user-input').keypress(function(e) {
+            if (e.which == 13) {
+                sendMessage();
+                return false;
+            }
+        });
+
+        $(document).ready(function() {
+            addMessage("안녕하세요! 음식 추천을 도와드릴게요. 먼저 위치 정보를 제공해 주세요.", false);
+            getLocation();
+        });
+    </script>
+</body>
+</html>
