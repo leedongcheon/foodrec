@@ -5,6 +5,9 @@ import json
 import naver
 import google_map
 
+from flask import send_file
+import os
+
 
 # 앱을 사용하는 전체적인 시나리오
 """
@@ -54,7 +57,7 @@ chat_session = model.start_chat(
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return send_file('index.html')
 
 @app.route('/get_recommendation', methods=['POST'])
 def get_recommendation():
